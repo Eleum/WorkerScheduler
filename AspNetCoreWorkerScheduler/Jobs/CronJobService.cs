@@ -1,6 +1,7 @@
 ﻿using Cronos;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -57,6 +58,9 @@ namespace AspNetCoreWorkerScheduler.Jobs
                             await DoWork(cancellationToken);
 
                         if (!cancellationToken.IsCancellationRequested)
+                            await UpdateConfig(cancellationToken);
+
+                        if (!cancellationToken.IsCancellationRequested)
                             await ScheduleJob(cancellationToken);
 
                         cancellationToken.ThrowIfCancellationRequested();
@@ -81,6 +85,11 @@ namespace AspNetCoreWorkerScheduler.Jobs
         public virtual async Task DoWork(CancellationToken cancellationToken)
         {
             await Task.Delay(5000, cancellationToken);
+        }
+
+        public virtual async Task UpdateConfig(CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
         }
 
         public virtual async Task StopAsync(CancellationToken cancellationToken)
