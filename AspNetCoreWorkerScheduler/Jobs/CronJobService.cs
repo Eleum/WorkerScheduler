@@ -42,7 +42,6 @@ namespace AspNetCoreWorkerScheduler.Jobs
                 if (delay.TotalMilliseconds <= 0)
                 {
                     await ScheduleJob(cancellationToken);
-                    await Task.CompletedTask;
                     return;
                 }
 
@@ -70,9 +69,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
                     catch (Exception e)
                     {
                         _logger.LogError($"Unhandled exception occured in {this};\n{e.Message}\n{e.StackTrace}");
-                        _currentCts.Cancel();
-
-                        await RestartAsync();
+                        await ScheduleJob(cancellationToken);
                     }
                 };
                 _timer.Start();

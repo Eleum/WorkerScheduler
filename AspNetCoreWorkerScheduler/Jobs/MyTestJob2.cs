@@ -20,7 +20,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
 
         public override Task StartAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("cron job 2 started");
+            _logger.LogWarning("cron job 2 started");
             return base.StartAsync(cancellationToken);
         }
 
@@ -32,7 +32,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
 
         public override Task StopAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation($"cron job 2 is stopping");
+            _logger.LogWarning($"cron job 2 is stopping");
             return base.StopAsync(cancellationToken);
         }
     }

@@ -25,12 +25,12 @@ namespace AspNetCoreWorkerScheduler
                     services.AddCronJob<MyTestJob1>(options =>
                     {
                         options.TimeZoneInfo = TimeZoneInfo.Local;
-                        options.CronExpression = @"*/2 * * * * *";
+                        options.CronExpression = @"*/1 * * * * *";
                     });
                     services.AddCronJob<MyTestJob2>(options =>
                     {
                         options.TimeZoneInfo = TimeZoneInfo.Local;
-                        options.CronExpression = @"*/10 * * * * *";
+                        options.CronExpression = @"*/5 * * * * *";
                     });
                 })
                 .ConfigureLogging((context, logging) =>
