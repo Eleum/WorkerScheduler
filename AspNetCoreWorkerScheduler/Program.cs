@@ -20,30 +20,21 @@ namespace AspNetCoreWorkerScheduler
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
+                .UseWindowsService()
                 .ConfigureServices((hostContext, services) =>
                 {
-                    services.AddCronJob<MyTestJob1>(options =>
-                    {
-                        options.TimeZoneInfo = TimeZoneInfo.Local;
-                        options.CronExpression = @"*/1 * * * * *";
-                    });
-                    services.AddCronJob<MyTestJob2>(options =>
-                    {
-                        options.TimeZoneInfo = TimeZoneInfo.Local;
-                        options.CronExpression = @"*/5 * * * * *";
-                    });
+                    services.LoadConfig();
                 })
                 .ConfigureLogging((context, logging) =>
                 {
-                    // clear providers to allow AddEventLog() create a new journal in EventViewer
+                    // удалить провайдеры (провайдер EventLog-а от UseWindowsService) для возможности добавления нового журнала в EventViewer
                     logging.ClearProviders();
                     logging.AddConsole();
                     logging.AddEventLog(new EventLogSettings
                     {
-                        SourceName = "TestSource",
-                        LogName = "AspNetCoreWorkerService"
+                        LogName = "AspNetCoreWorkerService",
+                        SourceName = "AspNetCoreService"
                     });
-                })
-                .UseWindowsService();
+                });
     }
 }
