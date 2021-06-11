@@ -2,9 +2,8 @@
 
 namespace AspNetCoreWorkerScheduler.Interfaces
 {
-    public interface IScheduleConfig<T>
+    public interface IScheduleConfig
     {
-        string CronExpression { get; set; }
-        TimeZoneInfo TimeZoneInfo { get; set; }
+        string Cron { get; set; }
     }
 }

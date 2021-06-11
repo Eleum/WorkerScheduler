@@ -23,7 +23,7 @@ namespace AspNetCoreWorkerScheduler
                 .UseWindowsService()
                 .ConfigureServices((hostContext, services) =>
                 {
-                    services.LoadConfig();
+                    services.AddConfig().AddCronJobs();
                 })
                 .ConfigureLogging((context, logging) =>
                 {
