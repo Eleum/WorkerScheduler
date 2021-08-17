@@ -1,5 +1,4 @@
 ﻿using AspNetCoreWorkerScheduler.Configuration.Options;
-using AspNetCoreWorkerScheduler.Interfaces;
 using AspNetCoreWorkerScheduler.Jobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

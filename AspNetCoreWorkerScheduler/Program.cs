@@ -15,7 +15,7 @@ namespace AspNetCoreWorkerScheduler
         public static void Main(string[] args)
         {
             CreateHostBuilder(args).Build().Run();
-            //выйти, если ошибка
+            //TODO: exit on exception
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -27,7 +27,7 @@ namespace AspNetCoreWorkerScheduler
                 })
                 .ConfigureLogging((context, logging) =>
                 {
-                    // удалить провайдеры (провайдер EventLog-а от UseWindowsService) для возможности добавления нового журнала в EventViewer
+                    // remove EventLog provider from UseWindowsService to add it manually with AddEventLog
                     logging.ClearProviders();
                     logging.AddConsole();
                     logging.AddEventLog(new EventLogSettings

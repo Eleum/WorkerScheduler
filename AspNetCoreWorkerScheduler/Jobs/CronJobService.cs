@@ -1,6 +1,4 @@
-﻿using AspNetCoreWorkerScheduler.Enums;
-using AspNetCoreWorkerScheduler.Interfaces;
-using Cronos;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,14 +9,19 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
+using Cronos;
+using AspNetCoreWorkerScheduler.Configuration;
+using AspNetCoreWorkerScheduler.Enums;
 using Timer = System.Timers.Timer;
 
 namespace AspNetCoreWorkerScheduler.Jobs
 {
-    public abstract class CronJobService : IHostedService, IDisposable
+    public abstract class CronJobService<T> : IHostedService, IDisposable where T: SchedulerConfig
     {
-        private readonly TimeZoneInfo _timeZoneInfo = TimeZoneInfo.Local;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ILogger _logger;
+
+        private readonly TimeZoneInfo _timeZoneInfo = TimeZoneInfo.Local;
 
         private CancellationTokenSource _currentCts;
         private CronExpression _cronExpression;
@@ -26,22 +29,50 @@ namespace AspNetCoreWorkerScheduler.Jobs
 
         public JobStatus JobStatus { get; set; }
 
-        public CronJobService(ILogger logger)
+        public CronJobService(IServiceProvider serviceProvider, ILogger logger)
         {
-            _logger = logger;
             JobStatus = JobStatus.Initializing;
+
+            _serviceProvider = serviceProvider;
+            _logger = logger;
+
+            JobStatus = JobStatus.Initialized;
         }
 
-        protected async Task InitializeCoreAsync(IScheduleConfig config, CancellationToken cancellationToken)
+        protected async Task<T> GetCurrentScopeConfig()
+        {
+            JobStatus = JobStatus.Configuring;
+            T config;
+
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                config = scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<T>>().Value;
+            }
+            catch (OptionsValidationException e)
+            {
+                _logger.LogError($"Options validation occured for {this}:\n\t{string.Join("; ", e.Failures)}");
+                await StopAsync(_currentCts is null ? default : _currentCts.Token);
+
+                return default;
+            }
+
+            JobStatus = JobStatus.Configured;
+            return config;
+        }
+
+        protected async Task InitializeCoreAsync(SchedulerConfig config)
         {
             if (string.IsNullOrWhiteSpace(config?.Cron)) return;
-
+            
             _cronExpression = CronExpression.Parse(config.Cron, CronFormat.IncludeSeconds);
             await Task.CompletedTask;
         }
 
         public virtual async Task StartAsync(CancellationToken cancellationToken)
         {
+            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is starting...");
+
             _currentCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             await ScheduleJob(_currentCts.Token);
         }
@@ -97,8 +128,8 @@ namespace AspNetCoreWorkerScheduler.Jobs
                 }
                 catch (Exception e)
                 {
-                    _logger.LogError($"Unhandled exception occured in {this}: {e.Message?.TrimEnd()}\nStack trace:\n{e.StackTrace}");
-                    await ScheduleJob(cancellationToken);
+                    _logger.LogError($"Unhandled exception occured in {this}: {e.Message?.TrimEnd()}");
+                    await RestartAsync(_currentCts.Token);
                 }
             };
             _timer.Start();
@@ -118,6 +149,10 @@ namespace AspNetCoreWorkerScheduler.Jobs
 
         public virtual async Task StopAsync(CancellationToken cancellationToken)
         {
+            if (JobStatus == JobStatus.Stopped) return;
+
+            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is stopping...");
+
             _timer?.Stop();
 
             if (JobStatus != JobStatus.Restarting)
@@ -126,12 +161,12 @@ namespace AspNetCoreWorkerScheduler.Jobs
             await Task.CompletedTask;
         }
 
-        public virtual async Task RestartAsync()
+        public virtual async Task RestartAsync(CancellationToken cancellationToken)
         {
             JobStatus = JobStatus.Restarting;
             var cts = new CancellationTokenSource();
 
-            await StopAsync(_currentCts.Token);
+            await StopAsync(cancellationToken);
             await StartAsync(cts.Token);
         }
 

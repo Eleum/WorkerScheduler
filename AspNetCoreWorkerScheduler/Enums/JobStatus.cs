@@ -9,6 +9,9 @@ namespace AspNetCoreWorkerScheduler.Enums
     public enum JobStatus
     {
         Initializing,
+        Initialized,
+        Configuring,
+        Configured,
         Scheduled,
         Executing,
         Stopped,

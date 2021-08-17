@@ -1,5 +1,4 @@
 ﻿using AspNetCoreWorkerScheduler.Configuration.Options;
-using AspNetCoreWorkerScheduler.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -11,46 +10,34 @@ using System.Threading.Tasks;
 
 namespace AspNetCoreWorkerScheduler.Jobs
 {
-    public class MyTestJob1 : CronJobService
+    public class MyTestJob1 : CronJobService<TestJob1Options>
     {
-        private readonly TestJob1Options _config;
         private readonly ILogger<MyTestJob1> _logger;
+        private TestJob1Options _config;
 
-        public MyTestJob1(IOptions<TestJob1Options> options, ILogger<MyTestJob1> logger) : base(logger)
+        public MyTestJob1(IServiceProvider serviceProvider, ILogger<MyTestJob1> logger) : base(serviceProvider, logger)
         {
-            try
-            {
-                _logger = logger;
-                _config = options.Value;
-            }
-            catch (OptionsValidationException e)
-            {
-                _logger.LogError($"Options validation occured for {this}:\n{string.Join("; ", e.Failures)}");
-            }
+            _logger = logger;
         }
 
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
-            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: Cron job 1 is starting...");
+            _config = await GetCurrentScopeConfig();
+            if (_config is null) return;
 
-            await InitializeCoreAsync(_config, cancellationToken);
+            await InitializeCoreAsync(_config);
             await base.StartAsync(cancellationToken);
         }
 
         public override async Task DoWork(CancellationToken cancellationToken)
         {
             _logger.LogInformation($"{DateTime.Now:hh:mm:ss}: Cron job 1 fired execution");
+            _logger.LogInformation($"ANY value: {_config.Any}");
 
             if (new Random().Next(0, 5) == 1)
                 throw new Exception("123 hehehhehe");
 
             await Task.CompletedTask;
-        }
-
-        public override Task StopAsync(CancellationToken cancellationToken)
-        {
-            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: Cron job 1 is stopping...");
-            return base.StopAsync(cancellationToken);
         }
     }
 }
