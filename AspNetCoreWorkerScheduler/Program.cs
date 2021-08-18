@@ -1,4 +1,5 @@
 using AspNetCoreWorkerScheduler.Jobs;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -21,7 +22,11 @@ namespace AspNetCoreWorkerScheduler
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
                 .UseWindowsService()
-                .ConfigureServices((hostContext, services) =>
+                .ConfigureAppConfiguration((context, configuration) =>
+                {
+                    configuration.AddJsonFile("config.json", true, true);
+                })
+                .ConfigureServices((context, services) =>
                 {
                     services.AddConfig().AddCronJobs();
                 })
