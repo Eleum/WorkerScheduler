@@ -1,4 +1,5 @@
-﻿using AspNetCoreWorkerScheduler.Configuration.Options;
+﻿using AspNetCoreWorkerScheduler.Configuration;
+using AspNetCoreWorkerScheduler.Configuration.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -15,29 +16,21 @@ namespace AspNetCoreWorkerScheduler.Jobs
         private readonly ILogger<MyTestJob1> _logger;
         private TestJob1Options _config;
 
-        public MyTestJob1(IServiceProvider serviceProvider, ILogger<MyTestJob1> logger) : base(serviceProvider, logger)
+        public MyTestJob1(IConfigurationUpdater configUpdater, IOptionsMonitor<TestJob1Options> om, IServiceProvider serviceProvider, ILogger<MyTestJob1> logger) : 
+            base(configUpdater, om, serviceProvider, logger)
         {
             _logger = logger;
         }
 
-        public override async Task StartAsync(CancellationToken cancellationToken)
+        protected override async Task DoWorkAsync(CancellationToken cancellationToken)
         {
-            _config = await GetCurrentScopeConfig();
-            if (_config is null) return;
+            await base.DoWorkAsync(cancellationToken);
 
-            await InitializeCoreAsync(_config);
-            await base.StartAsync(cancellationToken);
-        }
-
-        public override async Task DoWork(CancellationToken cancellationToken)
-        {
-            _logger.LogInformation($"{DateTime.Now:hh:mm:ss}: Cron job 1 fired execution");
             _logger.LogInformation($"ANY value: {_config.Any}");
+            _logger.LogInformation($"Previous execution time: {_config.PreviousExecutionTime}");
 
             if (new Random().Next(0, 5) == 1)
                 throw new Exception("123 hehehhehe");
-
-            await Task.CompletedTask;
         }
     }
 }

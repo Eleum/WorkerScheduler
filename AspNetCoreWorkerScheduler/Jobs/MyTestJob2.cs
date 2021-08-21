@@ -7,32 +7,31 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using AspNetCoreWorkerScheduler.Configuration.Options;
+using AspNetCoreWorkerScheduler.Interfaces;
 
 namespace AspNetCoreWorkerScheduler.Jobs
 {
     public class MyTestJob2 : CronJobService<TestJob2Options>
     {
         private readonly ILogger<MyTestJob2> _logger;
-        private TestJob2Options _config;
 
-        public MyTestJob2(IServiceProvider serviceProvider, ILogger<MyTestJob2> logger) : base(serviceProvider, logger)
+        public MyTestJob2(
+            IConfigurationUpdater configurationUpdater, 
+            IOptionsMonitor<TestJob2Options> configurationMonitor, 
+            IServiceProvider serviceProvider, 
+            ILogger<MyTestJob2> logger) :
+            base(configurationUpdater, configurationMonitor, serviceProvider, logger)
         {
             _logger = logger;
         }
 
-        public override async Task StartAsync(CancellationToken cancellationToken)
+        protected override async Task DoWorkAsync(CancellationToken cancellationToken)
         {
-            _config = await GetCurrentScopeConfig();
-            if (_config is null) return;
+            await base.DoWorkAsync(cancellationToken);
 
-            await InitializeCoreAsync(_config);
-            await base.StartAsync(cancellationToken);
-        }
+            _logger.LogInformation($"\n\tANY value: {Config.Any}\n\tPrevious execution time: {Config.PreviousExecutionTime:yyyy-MM-dd HH:mm:ss}");
 
-        public override async Task DoWork(CancellationToken cancellationToken)
-        {
-            _logger.LogInformation($"{DateTime.Now:hh:mm:ss}: Cron job 2 fired execution");
-            await Task.CompletedTask;
+            await UpdateConfigurationAsync(nameof(TestJob2Options.PreviousExecutionTime), DateTime.Now, cancellationToken);
         }
     }
 }

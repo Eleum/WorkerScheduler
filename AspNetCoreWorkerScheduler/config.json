@@ -1,11 +1,7 @@
 {
-  "TestJob1": {
+  "MyTestJob2": {
     "Cron": "*/1 * * * * *",
-    "Any": "1"
-
-  },
-  "TestJob2": {
-    "Cron": "*/5 * * * * *",
-    "Any": "ABBA"
+    "PreviousExecutionTime": "0001-01-01",
+    "Any": "Any"
   }
 }

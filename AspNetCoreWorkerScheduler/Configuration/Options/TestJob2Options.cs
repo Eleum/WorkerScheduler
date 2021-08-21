@@ -1,4 +1,5 @@
-﻿using System;
+﻿using AspNetCoreWorkerScheduler.Jobs;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,8 +7,8 @@ using System.Threading.Tasks;
 
 namespace AspNetCoreWorkerScheduler.Configuration.Options
 {
-    public class TestJob2Options : SchedulerConfig
+    public class TestJob2Options : JobConfiguration
     {
-        public const string TestJob2 = "TestJob2";
+        public const string TestJob2 = nameof(MyTestJob2);
     }
 }
