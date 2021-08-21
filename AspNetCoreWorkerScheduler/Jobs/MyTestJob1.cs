@@ -1,13 +1,10 @@
-﻿using AspNetCoreWorkerScheduler.Configuration;
-using AspNetCoreWorkerScheduler.Configuration.Options;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using AspNetCoreWorkerScheduler.Configuration.Options;
+using AspNetCoreWorkerScheduler.Interfaces;
 
 namespace AspNetCoreWorkerScheduler.Jobs
 {

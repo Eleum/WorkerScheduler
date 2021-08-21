@@ -2,6 +2,7 @@
 using System.IO;
 using System.Threading;
 using Newtonsoft.Json;
+using AspNetCoreWorkerScheduler.Interfaces;
 
 namespace AspNetCoreWorkerScheduler.Configuration
 {
