@@ -119,7 +119,6 @@ namespace AspNetCoreWorkerScheduler.Jobs
             if (string.IsNullOrWhiteSpace(config?.Cron)) return;
 
             _cronExpression = CronExpression.Parse(config.Cron, CronFormat.IncludeSeconds);
-            _logger.LogDebug($"initialized with prev exec time: {config.PreviousExecutionTime}");
 
             await Task.CompletedTask;
         }
