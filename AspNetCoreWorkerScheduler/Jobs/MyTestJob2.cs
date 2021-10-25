@@ -16,11 +16,11 @@ namespace AspNetCoreWorkerScheduler.Jobs
         private readonly ILogger<MyTestJob2> _logger;
 
         public MyTestJob2(
+            IConfigurationChangeListener<TestJob2Options> configurationChangeListener,
             IConfigurationUpdater configurationUpdater, 
-            IOptionsMonitor<TestJob2Options> configurationMonitor, 
             IServiceProvider serviceProvider, 
             ILogger<MyTestJob2> logger) :
-            base(configurationUpdater, configurationMonitor, serviceProvider, logger)
+            base(configurationChangeListener, configurationUpdater, serviceProvider, logger)
         {
             _logger = logger;
         }
@@ -29,7 +29,9 @@ namespace AspNetCoreWorkerScheduler.Jobs
         {
             await base.DoWorkAsync(cancellationToken);
 
-            _logger.LogInformation($"\n\tANY value: {Config.Any}\n\tPrevious execution time: {Config.PreviousExecutionTime:yyyy-MM-dd HH:mm:ss}");
+            _logger.LogInformation($"\t" +
+                $"ANY value: {Config.Any}\n\t" +
+                $"Previous execution time: {Config.PreviousExecutionTime:yyyy-MM-dd HH:mm:ss}");
 
             await UpdateConfigurationAsync(nameof(TestJob2Options.PreviousExecutionTime), DateTime.Now, cancellationToken);
         }

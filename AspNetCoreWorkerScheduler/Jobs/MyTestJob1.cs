@@ -11,10 +11,13 @@ namespace AspNetCoreWorkerScheduler.Jobs
     public class MyTestJob1 : CronJobService<TestJob1Options>
     {
         private readonly ILogger<MyTestJob1> _logger;
-        private TestJob1Options _config;
 
-        public MyTestJob1(IConfigurationUpdater configUpdater, IOptionsMonitor<TestJob1Options> om, IServiceProvider serviceProvider, ILogger<MyTestJob1> logger) : 
-            base(configUpdater, om, serviceProvider, logger)
+        public MyTestJob1(
+            IConfigurationChangeListener<TestJob1Options> configurationChangeListener,
+            IConfigurationUpdater configurationUpdater,
+            IServiceProvider serviceProvider,
+            ILogger<MyTestJob1> logger) :
+            base(configurationChangeListener, configurationUpdater, serviceProvider, logger)
         {
             _logger = logger;
         }
@@ -23,8 +26,8 @@ namespace AspNetCoreWorkerScheduler.Jobs
         {
             await base.DoWorkAsync(cancellationToken);
 
-            _logger.LogInformation($"ANY value: {_config.Any}");
-            _logger.LogInformation($"Previous execution time: {_config.PreviousExecutionTime}");
+            _logger.LogInformation($"ANY value: {Config.Any}");
+            _logger.LogInformation($"Previous execution time: {Config.PreviousExecutionTime}");
 
             if (new Random().Next(0, 5) == 1)
                 throw new Exception("123 hehehhehe");

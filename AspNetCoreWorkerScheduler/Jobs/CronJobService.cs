@@ -20,8 +20,9 @@ namespace AspNetCoreWorkerScheduler.Jobs
 {
     public abstract class CronJobService<T> : IHostedService, IDisposable where T: JobConfiguration
     {
+        private readonly IConfigurationChangeListener<T> _configurationChangeListener;
         private readonly IConfigurationUpdater _configurationUpdater;
-        private readonly IOptionsMonitor<T> _configurationMonitor;
+        
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger _logger;
 
@@ -31,18 +32,13 @@ namespace AspNetCoreWorkerScheduler.Jobs
         private CronExpression _cronExpression;
         private Timer _timer;
 
-        public event Func<T, Task> OnConfigurationReloadAsync;
-
-        private IDisposable _configurationChangeListener;
-        private TaskCompletionSource _configurationChangeCompleted;
-
         public T Config
         {
             get
             {
                 try
                 {
-                    return _configurationMonitor.CurrentValue;
+                    return _configurationChangeListener.CurrentValue;
                 }
                 catch (OptionsValidationException e)
                 {
@@ -55,15 +51,16 @@ namespace AspNetCoreWorkerScheduler.Jobs
         public JobStatus JobStatus { get; set; }
 
         public CronJobService(
-            IConfigurationUpdater configurationUpdater, 
-            IOptionsMonitor<T> configurationMonitor, 
-            IServiceProvider serviceProvider, 
+            IConfigurationChangeListener<T> configurationChangeListener,
+            IConfigurationUpdater configurationUpdater,
+            IServiceProvider serviceProvider,
             ILogger logger)
         {
             JobStatus = JobStatus.Initializing;
 
+            // can this be null?
+            _configurationChangeListener = configurationChangeListener;
             _configurationUpdater = configurationUpdater;
-            _configurationMonitor = configurationMonitor;
             _serviceProvider = serviceProvider;
             _logger = logger;
 
@@ -107,6 +104,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
         public virtual async Task RestartAsync(CancellationToken cancellationToken)
         {
             JobStatus = JobStatus.Restarting;
+
             var cts = new CancellationTokenSource();
 
             await StopAsync(cancellationToken);
@@ -127,12 +125,10 @@ namespace AspNetCoreWorkerScheduler.Jobs
         {
             JobStatus = JobStatus.Configuring;
 
-            OnConfigurationReloadAsync += ConfigurationReloadHandler;
-            _configurationChangeListener = _configurationMonitor.OnChange(ConfigurationChangeHandler);
-
             if (allowConfigurationUpdates)
             {
                 RegisterConfigurationUpdater();
+                _configurationChangeListener.OnConfigurationChangedAsync += ConfigurationReloadHandler;
             }
 
             JobStatus = JobStatus.Configured;
@@ -200,6 +196,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
         protected virtual async Task DoWorkAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation($"{DateTime.Now:hh:mm:ss}: {this} fired execution");
+
             await Task.CompletedTask;
         }
 
@@ -218,10 +215,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
             if (propertyName is null)
                 throw new ArgumentException(string.Empty, nameof(propertyName));
 
-            _configurationUpdater.AddOrUpdate(propertyName.Replace('.', ':'), value);
-            _configurationChangeCompleted = new TaskCompletionSource();
-            
-            await _configurationChangeCompleted.Task;
+            await _configurationChangeListener.AwaitChangesCommitAfter(() => _configurationUpdater.AddOrUpdate(propertyName.Replace('.', ':'), value));
         }
 
         private void RegisterConfigurationUpdater()
@@ -229,14 +223,6 @@ namespace AspNetCoreWorkerScheduler.Jobs
             using var scope = _serviceProvider.CreateScope();
             var schedulerConfigOptions = scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<ConfigurationOptions>>().Value;
             _configurationUpdater.RegisterUpdatePath(schedulerConfigOptions.FilePath);
-        }
-
-        private void ConfigurationChangeHandler(T configuration)
-        {
-            OnConfigurationReloadAsync?.Invoke(configuration);
-
-            if (_configurationChangeCompleted?.Task.IsCompleted ?? true) return;
-            _configurationChangeCompleted.SetResult();
         }
 
         /// <summary>
@@ -250,6 +236,8 @@ namespace AspNetCoreWorkerScheduler.Jobs
         public virtual void Dispose()
         {
             _configurationChangeListener?.Dispose();
+            _configurationChangeListener.OnConfigurationChangedAsync -= ConfigurationReloadHandler;
+
             _timer?.Dispose();
             _currentCts?.Cancel();
         }

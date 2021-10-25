@@ -19,6 +19,7 @@ namespace AspNetCoreWorkerScheduler
             services.AddOptions<ConfigurationOptions>().Bind(configuration.GetSection(ConfigurationOptions.SectionPath));
 
             services.AddSingleton<IConfigurationUpdater, ConfigurationUpdater>();
+            services.AddSingleton(typeof(IConfigurationChangeListener<>), typeof(ConfigurationChangeListener<>));
 
             return services;
         }
