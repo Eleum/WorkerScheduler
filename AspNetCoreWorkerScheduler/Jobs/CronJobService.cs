@@ -22,7 +22,6 @@ namespace AspNetCoreWorkerScheduler.Jobs
     {
         private readonly IConfigurationChangeListener<T> _configurationChangeListener;
         private readonly IConfigurationUpdater _configurationUpdater;
-        
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger _logger;
 
@@ -58,7 +57,6 @@ namespace AspNetCoreWorkerScheduler.Jobs
         {
             JobStatus = JobStatus.Initializing;
 
-            // can this be null?
             _configurationChangeListener = configurationChangeListener;
             _configurationUpdater = configurationUpdater;
             _serviceProvider = serviceProvider;
@@ -215,7 +213,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
             if (propertyName is null)
                 throw new ArgumentException(string.Empty, nameof(propertyName));
 
-            await _configurationChangeListener.AwaitChangesCommitAfter(() => _configurationUpdater.AddOrUpdate(propertyName.Replace('.', ':'), value));
+            await _configurationChangeListener.AwaitChangesCompletionAfter(() => _configurationUpdater.AddOrUpdate(propertyName.Replace('.', ':'), value));
         }
 
         private void RegisterConfigurationUpdater()

@@ -24,7 +24,7 @@ namespace AspNetCoreWorkerScheduler
                 })
                 .ConfigureServices((context, services) =>
                 {
-                    services.AddConfig().AddCronJobs();
+                    services.AddConfig().AddConfigUpdates().AddCronJobs();
                 })
                 .ConfigureLogging((context, logging) =>
                 {

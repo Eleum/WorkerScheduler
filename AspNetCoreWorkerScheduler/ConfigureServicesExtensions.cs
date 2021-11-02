@@ -18,6 +18,11 @@ namespace AspNetCoreWorkerScheduler
             services.AddOptions<TestJob2Options>().Bind(configuration.GetSection(TestJob2Options.TestJob2)).ValidateDataAnnotations();
             services.AddOptions<ConfigurationOptions>().Bind(configuration.GetSection(ConfigurationOptions.SectionPath));
 
+            return services;
+        }
+
+        public static IServiceCollection AddConfigUpdates(this IServiceCollection services)
+        {
             services.AddSingleton<IConfigurationUpdater, ConfigurationUpdater>();
             services.AddSingleton(typeof(IConfigurationChangeListener<>), typeof(ConfigurationChangeListener<>));
 

@@ -13,6 +13,6 @@ namespace AspNetCoreWorkerScheduler.Interfaces
 
         T CurrentValue { get; }
 
-        Task<T1> AwaitChangesCommitAfter<T1>(Func<T1> configurationAction);
+        Task<T1> AwaitChangesCompletionAfter<T1>(Func<T1> configurationAction);
     }
 }
