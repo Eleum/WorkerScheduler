@@ -22,7 +22,6 @@ namespace AspNetCoreWorkerScheduler.Jobs
     {
         private readonly IConfigurationChangeListener<T> _configurationChangeListener;
         private readonly IConfigurationUpdater _configurationUpdater;
-        private readonly IServiceProvider _serviceProvider;
         private readonly ILogger _logger;
 
         private readonly TimeZoneInfo _timeZoneInfo = TimeZoneInfo.Local;
@@ -50,19 +49,13 @@ namespace AspNetCoreWorkerScheduler.Jobs
         public JobStatus JobStatus { get; set; }
 
         public CronJobService(
-            IConfigurationChangeListener<T> configurationChangeListener,
             IConfigurationUpdater configurationUpdater,
-            IServiceProvider serviceProvider,
+            IConfigurationChangeListener<T> configurationChangeListener,
             ILogger logger)
         {
-            JobStatus = JobStatus.Initializing;
-
             _configurationChangeListener = configurationChangeListener;
             _configurationUpdater = configurationUpdater;
-            _serviceProvider = serviceProvider;
             _logger = logger;
-
-            JobStatus = JobStatus.Initialized;
         }
 
         public virtual async Task StartAsync(CancellationToken cancellationToken)
@@ -72,14 +65,13 @@ namespace AspNetCoreWorkerScheduler.Jobs
             try
             {
                 await InitializeAsync(Config);
+                await ConfigureAsync();
             }
             catch (OptionsValidationException)
             {
                 await StopAsync(cancellationToken);
                 return;
             }
-
-            await ConfigureAsync();
 
             _currentCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             await ScheduleJobAsync(_currentCts.Token);
@@ -111,21 +103,25 @@ namespace AspNetCoreWorkerScheduler.Jobs
 
         protected virtual async Task InitializeAsync(JobConfiguration config)
         {
+            JobStatus = JobStatus.Initializing;
+
             _cronExpression = null;
             if (string.IsNullOrWhiteSpace(config?.Cron)) return;
 
             _cronExpression = CronExpression.Parse(config.Cron, CronFormat.IncludeSeconds);
 
             await Task.CompletedTask;
+
+            JobStatus = JobStatus.Initialized;
         }
 
-        protected Task ConfigureAsync(bool allowConfigurationUpdates = true)
+        protected virtual Task ConfigureAsync(bool allowConfigurationUpdates = true)
         {
             JobStatus = JobStatus.Configuring;
 
             if (allowConfigurationUpdates)
             {
-                RegisterConfigurationUpdater();
+                _configurationUpdater.RegisterUpdatePath();
                 _configurationChangeListener.OnConfigurationChangedAsync += ConfigurationReloadHandler;
             }
 
@@ -216,13 +212,6 @@ namespace AspNetCoreWorkerScheduler.Jobs
             await _configurationChangeListener.AwaitChangesCompletionAfter(() => _configurationUpdater.AddOrUpdate(propertyName.Replace('.', ':'), value));
         }
 
-        private void RegisterConfigurationUpdater()
-        {
-            using var scope = _serviceProvider.CreateScope();
-            var schedulerConfigOptions = scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<ConfigurationOptions>>().Value;
-            _configurationUpdater.RegisterUpdatePath(schedulerConfigOptions.FilePath);
-        }
-
         /// <summary>
         /// By default reinitializes cron expression used for service execution
         /// </summary>
@@ -233,8 +222,8 @@ namespace AspNetCoreWorkerScheduler.Jobs
 
         public virtual void Dispose()
         {
-            _configurationChangeListener?.Dispose();
             _configurationChangeListener.OnConfigurationChangedAsync -= ConfigurationReloadHandler;
+            _configurationChangeListener.Dispose();
 
             _timer?.Dispose();
             _currentCts?.Cancel();

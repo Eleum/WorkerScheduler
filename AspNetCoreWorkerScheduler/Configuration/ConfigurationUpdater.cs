@@ -2,16 +2,29 @@
 using System.IO;
 using System.Threading;
 using Newtonsoft.Json;
+using Microsoft.Extensions.Options;
+using AspNetCoreWorkerScheduler.Configuration.Options;
 using AspNetCoreWorkerScheduler.Interfaces;
 
 namespace AspNetCoreWorkerScheduler.Configuration
 {
     public class ConfigurationUpdater : IConfigurationUpdater
     {
+        private readonly IOptionsMonitor<ConfigurationOptions> _globalConfigOptionsMonitor;
         private readonly ReaderWriterLockSlim _rwl = new();
 
         private string _updatePath;
         public string UpdatePath => _updatePath;
+
+        public ConfigurationUpdater(IOptionsMonitor<ConfigurationOptions> globalConfigOptionsMonitor)
+        {
+            _globalConfigOptionsMonitor = globalConfigOptionsMonitor;
+        }
+
+        public void RegisterUpdatePath()
+        {
+            _updatePath = _globalConfigOptionsMonitor.CurrentValue?.FilePath;
+        }
 
         public void RegisterUpdatePath(string path)
         {

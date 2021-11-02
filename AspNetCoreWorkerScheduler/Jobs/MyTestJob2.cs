@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using AspNetCoreWorkerScheduler.Configuration.Options;
 using AspNetCoreWorkerScheduler.Interfaces;
 
@@ -16,11 +15,10 @@ namespace AspNetCoreWorkerScheduler.Jobs
         private readonly ILogger<MyTestJob2> _logger;
 
         public MyTestJob2(
-            IConfigurationChangeListener<TestJob2Options> configurationChangeListener,
             IConfigurationUpdater configurationUpdater, 
-            IServiceProvider serviceProvider, 
+            IConfigurationChangeListener<TestJob2Options> configurationChangeListener,
             ILogger<MyTestJob2> logger) :
-            base(configurationChangeListener, configurationUpdater, serviceProvider, logger)
+            base(configurationUpdater, configurationChangeListener, logger)
         {
             _logger = logger;
         }
