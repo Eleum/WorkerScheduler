@@ -17,10 +17,9 @@ namespace AspNetCoreWorkerScheduler.Tests
         private readonly JobConfiguration _configuration = Substitute.For<JobConfiguration>();
 
         [Fact]
-        public async Task CronJobService_StartingJob_FinishesWhenInvalidCronSupplied()
+        public async Task CronJobService_StartJob_FinishesWhenInvalidCronSupplied()
         {
-            var cronJobService = Substitute.For<CronJobService<JobConfiguration>>(_configurationChangeListener, _configurationUpdater, _logger);
-            cronJobService.When(x => x.StartAsync(Arg.Any<CancellationToken>())).CallBase();
+            var cronJobService = Substitute.ForPartsOf<CronJobService<JobConfiguration>>(_configurationChangeListener, _configurationUpdater, _logger);
             _configuration.Cron = "this is not a cron expression";
             _configurationChangeListener.CurrentValue.Returns(_configuration);
 
@@ -32,10 +31,10 @@ namespace AspNetCoreWorkerScheduler.Tests
         [Theory]
         [InlineData("")]
         [InlineData("          ")]
-        public async Task CronJobService_StartingJob_FinishesWhenEmptyOrNoCronSupplied(string cronExpression)
+        [InlineData(null)]
+        public async Task CronJobService_StartJob_FinishesWhenEmptyOrWhitespaceOrNoCronSupplied(string cronExpression)
         {
-            var cronJobService = Substitute.For<CronJobService<JobConfiguration>>(_configurationChangeListener, _configurationUpdater, _logger);
-            cronJobService.When(x => x.StartAsync(Arg.Any<CancellationToken>())).CallBase();
+            var cronJobService = Substitute.ForPartsOf<CronJobService<JobConfiguration>>(_configurationChangeListener, _configurationUpdater, _logger);
             _configuration.Cron = cronExpression;
             _configurationChangeListener.CurrentValue.Returns(_configuration);
 

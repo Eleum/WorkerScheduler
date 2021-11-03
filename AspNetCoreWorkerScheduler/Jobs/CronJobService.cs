@@ -70,6 +70,13 @@ namespace AspNetCoreWorkerScheduler.Jobs
                 await StopAsync(cancellationToken);
                 return;
             }
+            catch (CronFormatException)
+            {
+                _logger.LogError(CronJobConstants.FormatDefaultExceptionMessage<CronFormatException>(Config.Cron, this));
+
+                await StopAsync(cancellationToken);
+                return;
+            }
 
             _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             await ScheduleJobAsync(CancellationToken);

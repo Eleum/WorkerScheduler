@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AspNetCoreWorkerScheduler.Exceptions;
+using Cronos;
 
 namespace AspNetCoreWorkerScheduler.Helpers
 {
@@ -13,6 +14,7 @@ namespace AspNetCoreWorkerScheduler.Helpers
 
         public static readonly IReadOnlyDictionary<Type, string> DefaultExceptionMessages = new Dictionary<Type, string>()
         {
+            { typeof(CronFormatException), "Invalid cron expression '{0}' for job {1}" },
             { typeof(InvalidNextCronOccurenceException), "Job {0} was not scheduled for execution. Parsed cron expression: {1}, from offset: {2}, timezone: {3}" },
             { typeof(OperationCanceledException), "Job {0} was cancelled" },
             { typeof(Exception), "Unhandled exception occured in {0}: {1}" },
