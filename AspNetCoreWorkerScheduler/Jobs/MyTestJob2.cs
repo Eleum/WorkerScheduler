@@ -18,14 +18,14 @@ namespace AspNetCoreWorkerScheduler.Jobs
             IConfigurationUpdater configurationUpdater, 
             IConfigurationChangeListener<TestJob2Options> configurationChangeListener,
             ILogger<MyTestJob2> logger) :
-            base(configurationUpdater, configurationChangeListener, logger)
+            base(configurationChangeListener, configurationUpdater, logger)
         {
             _logger = logger;
         }
 
-        protected override async Task DoWorkAsync(CancellationToken cancellationToken)
+        protected override async Task ExecutionHandler(CancellationToken cancellationToken)
         {
-            await base.DoWorkAsync(cancellationToken);
+            await base.ExecutionHandler(cancellationToken);
 
             _logger.LogInformation($"\t" +
                 $"ANY value: {Config.Any}\n\t" +

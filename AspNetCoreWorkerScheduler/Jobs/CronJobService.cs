@@ -1,24 +1,20 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Timers;
 using Cronos;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using AspNetCoreWorkerScheduler.Configuration;
-using AspNetCoreWorkerScheduler.Configuration.Options;
 using AspNetCoreWorkerScheduler.Enums;
 using AspNetCoreWorkerScheduler.Interfaces;
+using AspNetCoreWorkerScheduler.Exceptions;
+using AspNetCoreWorkerScheduler.Helpers;
 using Timer = System.Timers.Timer;
 
 namespace AspNetCoreWorkerScheduler.Jobs
 {
-    public abstract class CronJobService<T> : IHostedService, IDisposable where T: JobConfiguration
+    public abstract class CronJobService<T> : IHostedService, IDisposable where T : JobConfiguration
     {
         private readonly IConfigurationChangeListener<T> _configurationChangeListener;
         private readonly IConfigurationUpdater _configurationUpdater;
@@ -26,9 +22,11 @@ namespace AspNetCoreWorkerScheduler.Jobs
 
         private readonly TimeZoneInfo _timeZoneInfo = TimeZoneInfo.Local;
 
-        private CancellationTokenSource _currentCts;
+        private CancellationTokenSource _cts;
         private CronExpression _cronExpression;
         private Timer _timer;
+
+        public CancellationToken CancellationToken => _cts?.Token ?? CancellationToken.None;
 
         public T Config
         {
@@ -49,8 +47,8 @@ namespace AspNetCoreWorkerScheduler.Jobs
         public JobStatus JobStatus { get; set; }
 
         public CronJobService(
-            IConfigurationUpdater configurationUpdater,
             IConfigurationChangeListener<T> configurationChangeListener,
+            IConfigurationUpdater configurationUpdater,
             ILogger logger)
         {
             _configurationChangeListener = configurationChangeListener;
@@ -58,13 +56,13 @@ namespace AspNetCoreWorkerScheduler.Jobs
             _logger = logger;
         }
 
-        public virtual async Task StartAsync(CancellationToken cancellationToken)
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
             _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is starting...");
 
             try
             {
-                await InitializeAsync(Config);
+                await InitializeAsync();
                 await ConfigureAsync();
             }
             catch (OptionsValidationException)
@@ -73,75 +71,139 @@ namespace AspNetCoreWorkerScheduler.Jobs
                 return;
             }
 
-            _currentCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            await ScheduleJobAsync(_currentCts.Token);
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            await ScheduleJobAsync(CancellationToken);
         }
 
-        public virtual async Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
-            if (JobStatus == JobStatus.Stopped) return;
+            await StopHandler();
 
-            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is stopping...");
-
+            _configurationChangeListener.OnConfigurationChangedAsync -= ConfigurationReloadHandler;
             _timer?.Stop();
 
             if (JobStatus != JobStatus.Restarting)
                 JobStatus = JobStatus.Stopped;
-
-            await Task.CompletedTask;
         }
 
-        public virtual async Task RestartAsync(CancellationToken cancellationToken)
+        public async Task RestartAsync(CancellationToken cancellationToken)
         {
             JobStatus = JobStatus.Restarting;
 
-            var cts = new CancellationTokenSource();
-
             await StopAsync(cancellationToken);
-            await StartAsync(cts.Token);
+            await StartAsync(CancellationToken.None);
         }
 
-        protected virtual async Task InitializeAsync(JobConfiguration config)
+        public virtual async Task UpdateConfigurationAsync<T1>(string propertyName, T1 value, CancellationToken cancellationToken)
+        {
+            await UpdateConfigurationInternal($"{this.GetType().Name}.{propertyName}", value);
+        }
+
+        public Task CancelExecutionAsync()
+        {
+            _cts?.Cancel();
+            return Task.CompletedTask;
+        }
+
+        private async Task InitializeAsync()
         {
             JobStatus = JobStatus.Initializing;
 
-            _cronExpression = null;
-            if (string.IsNullOrWhiteSpace(config?.Cron)) return;
-
-            _cronExpression = CronExpression.Parse(config.Cron, CronFormat.IncludeSeconds);
-
-            await Task.CompletedTask;
+            await InitializeHandler(Config);
 
             JobStatus = JobStatus.Initialized;
         }
 
-        protected virtual Task ConfigureAsync(bool allowConfigurationUpdates = true)
+        private async Task ConfigureAsync(bool allowConfigurationUpdates = true)
         {
             JobStatus = JobStatus.Configuring;
 
+            await ConfigureHandler(allowConfigurationUpdates);
+
+            JobStatus = JobStatus.Configured;
+        }
+
+        private async Task ScheduleJobAsync(CancellationToken cancellationToken)
+        {
+            var from = DateTimeOffset.Now;
+
+            try
+            {
+                await ScheduleInternal(from, cancellationToken);
+                JobStatus = JobStatus.Scheduled;
+            }
+            catch (InvalidNextCronOccurenceException)
+            {
+                _logger.LogError(CronJobConstants.FormatDefaultExceptionMessage<InvalidNextCronOccurenceException>(this, Config?.Cron, from, _timeZoneInfo));
+                await StopAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning(CronJobConstants.FormatDefaultExceptionMessage<OperationCanceledException>(this));
+                await StopAsync(cancellationToken);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(CronJobConstants.FormatDefaultExceptionMessage<Exception>(this, e.Message?.TrimEnd()));
+                await RestartAsync(cancellationToken);
+            }
+        }
+
+        /// <summary>
+        /// Initializes internal cron expression from config
+        /// </summary>
+        protected virtual Task InitializeHandler(T config)
+        {
+            _cronExpression = null;
+
+            if (string.IsNullOrWhiteSpace(config?.Cron))
+                return Task.CompletedTask;
+
+            _cronExpression = CronExpression.Parse(config.Cron, CronFormat.IncludeSeconds);
+
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Configures job configuration updates if allowed
+        /// </summary>
+        protected virtual Task ConfigureHandler(bool allowConfigurationUpdates)
+        {
             if (allowConfigurationUpdates)
             {
                 _configurationUpdater.RegisterUpdatePath();
                 _configurationChangeListener.OnConfigurationChangedAsync += ConfigurationReloadHandler;
             }
 
-            JobStatus = JobStatus.Configured;
-
             return Task.CompletedTask;
         }
 
-        protected virtual async Task ScheduleJobAsync(CancellationToken cancellationToken)
+        protected virtual Task ExecutionHandler(CancellationToken cancellationToken)
         {
-            var next = _cronExpression?.GetNextOccurrence(DateTimeOffset.Now, _timeZoneInfo);
+            _logger.LogInformation($"{DateTime.Now:hh:mm:ss}: {this} fired execution");
+            return Task.CompletedTask;
+        }
+
+        protected virtual Task StopHandler()
+        {
+            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is stopping...");
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// By default calls <see cref="InitializeAsync"/>
+        /// </summary>
+        protected virtual Task ConfigurationReloadHandler(T config)
+        {
+            return InitializeAsync();
+        }
+
+        private async Task ScheduleInternal(DateTimeOffset from, CancellationToken cancellationToken)
+        {
+            var next = _cronExpression?.GetNextOccurrence(from, _timeZoneInfo);
             if (!next.HasValue)
             {
-                _logger.LogError($"{this} was not scheduled for execution");
-
-                if (JobStatus == JobStatus.Restarting)
-                    JobStatus = JobStatus.Stopped;
-
-                await StopAsync(cancellationToken);
-                return;
+                throw new InvalidNextCronOccurenceException();
             }
 
             var delay = next.Value - DateTimeOffset.Now;
@@ -151,57 +213,25 @@ namespace AspNetCoreWorkerScheduler.Jobs
                 return;
             }
 
-            JobStatus = JobStatus.Scheduled;
-
             _timer = new Timer(delay.TotalMilliseconds);
-            _timer.Elapsed += async (sender, args) =>
-            {
-                try
-                {
-                    JobStatus = JobStatus.Executing;
-
-                    _timer.Dispose();
-                    _timer = null;
-
-                    if (!cancellationToken.IsCancellationRequested)
-                        await DoWorkAsync(cancellationToken);
-
-                    if (!cancellationToken.IsCancellationRequested)
-                        await ScheduleJobAsync(cancellationToken);
-
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
-                catch (OperationCanceledException e)
-                {
-                    _logger.LogWarning($"{this} was cancelled");
-                    await StopAsync(cancellationToken);
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError($"Unhandled exception occured in {this}: {e.Message?.TrimEnd()}");
-                    await RestartAsync(_currentCts.Token);
-                }
-            };
+            _timer.Elapsed += async (sender, args) => await ExecuteInternal(cancellationToken);
             _timer.Start();
-
-            await Task.CompletedTask;
         }
 
-        protected virtual async Task DoWorkAsync(CancellationToken cancellationToken)
+        private async Task ExecuteInternal(CancellationToken cancellationToken)
         {
-            _logger.LogInformation($"{DateTime.Now:hh:mm:ss}: {this} fired execution");
+            JobStatus = JobStatus.Executing;
 
-            await Task.CompletedTask;
-        }
+            _timer.Dispose();
+            _timer = null;
 
-        public virtual async Task UpdateConfigurationAsync(T value, CancellationToken cancellationToken)
-        {
-            await UpdateConfigurationInternal(this.GetType().Name, value);
-        }
-        
-        public virtual async Task UpdateConfigurationAsync<T1>(string propertyName, T1 value, CancellationToken cancellationToken)
-        {
-            await UpdateConfigurationInternal($"{this.GetType().Name}.{propertyName}", value);
+            if (!cancellationToken.IsCancellationRequested)
+                await ExecutionHandler(cancellationToken);
+
+            if (!cancellationToken.IsCancellationRequested)
+                await ScheduleJobAsync(cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
         }
 
         private async Task UpdateConfigurationInternal<T1>(string propertyName, T1 value)
@@ -212,21 +242,13 @@ namespace AspNetCoreWorkerScheduler.Jobs
             await _configurationChangeListener.AwaitChangesCompletionAfter(() => _configurationUpdater.AddOrUpdate(propertyName.Replace('.', ':'), value));
         }
 
-        /// <summary>
-        /// By default reinitializes cron expression used for service execution
-        /// </summary>
-        protected virtual async Task ConfigurationReloadHandler(T config)
-        {
-            await InitializeAsync(config);
-        }
-
         public virtual void Dispose()
         {
-            _configurationChangeListener.OnConfigurationChangedAsync -= ConfigurationReloadHandler;
-            _configurationChangeListener.Dispose();
+            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is disposing...");
 
+            _configurationChangeListener.Dispose();
             _timer?.Dispose();
-            _currentCts?.Cancel();
+            _cts?.Cancel();
         }
     }
 }
