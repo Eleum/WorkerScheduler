@@ -1,9 +1,9 @@
-﻿using AspNetCoreWorkerScheduler.Configuration.Handlers;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AspNetCoreWorkerScheduler.Configuration.Handlers;
 
 namespace AspNetCoreWorkerScheduler.Interfaces
 {
@@ -13,6 +13,6 @@ namespace AspNetCoreWorkerScheduler.Interfaces
 
         T CurrentValue { get; }
 
-        Task<T1> AwaitChangesCompletionAfter<T1>(Func<T1> configurationAction);
+        public Task<T1> AwaitChangesCompletionAfter<T1>(IConfigurationUpdater configurationUpdater, Func<IConfigurationUpdater, T1> configurationAction);
     }
 }

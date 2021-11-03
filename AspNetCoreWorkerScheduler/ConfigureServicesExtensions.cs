@@ -23,8 +23,8 @@ namespace AspNetCoreWorkerScheduler
 
         public static IServiceCollection AddConfigUpdates(this IServiceCollection services)
         {
-            services.AddSingleton<IConfigurationUpdater, ConfigurationUpdater>();
             services.AddSingleton(typeof(IConfigurationChangeListener<>), typeof(ConfigurationChangeListener<>));
+            services.AddSingleton<IConfigurationUpdater, ConfigurationUpdater>();
 
             return services;
         }

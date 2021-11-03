@@ -25,11 +25,11 @@ namespace AspNetCoreWorkerScheduler.Configuration
             _changeListener = _configurationMonitor.OnChange(ConfigurationChangedHandler);
         }
 
-        public async Task<T1> AwaitChangesCompletionAfter<T1>(Func<T1> configurationAction)
+        public async Task<T1> AwaitChangesCompletionAfter<T1>(IConfigurationUpdater configurationUpdater, Func<IConfigurationUpdater, T1> configurationAction)
         {
             _changeCompletion = new TaskCompletionSource();
 
-            var result = configurationAction();
+            var result = configurationAction(configurationUpdater);
             await _changeCompletion.Task;
 
             return result;
@@ -38,11 +38,7 @@ namespace AspNetCoreWorkerScheduler.Configuration
         private void ConfigurationChangedHandler(T configuration)
         {
             OnConfigurationChangedAsync?.Invoke(configuration);
-
-            if (_changeCompletion?.Task.IsCompleted ?? true)
-                return;
-
-            _changeCompletion?.SetResult();
+            _changeCompletion?.TrySetResult();
         }
 
         public void Dispose()

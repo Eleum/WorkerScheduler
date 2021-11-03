@@ -239,7 +239,9 @@ namespace AspNetCoreWorkerScheduler.Jobs
             if (propertyName is null)
                 throw new ArgumentException(string.Empty, nameof(propertyName));
 
-            await _configurationChangeListener.AwaitChangesCompletionAfter(() => _configurationUpdater.AddOrUpdate(propertyName.Replace('.', ':'), value));
+            await _configurationChangeListener.AwaitChangesCompletionAfter(
+                _configurationUpdater, 
+                (configurationUpdater) => configurationUpdater.AddOrUpdate(propertyName.Replace('.', ':'), value));
         }
 
         public virtual void Dispose()
