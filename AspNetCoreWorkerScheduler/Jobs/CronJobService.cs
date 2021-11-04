@@ -38,7 +38,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
                 }
                 catch (OptionsValidationException e)
                 {
-                    _logger.LogError($"Options validation failure occured for {this}:\n\t{string.Join("; ", e.Failures)}");
+                    _logger.LogError(CronJobConstants.FormatExceptionMessage<OptionsValidationException>(this, string.Join("\n", e.Failures)));
                     throw;
                 }
             }
@@ -58,7 +58,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is starting...");
+            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is starting");
 
             try
             {
@@ -72,7 +72,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
             }
             catch (CronFormatException)
             {
-                _logger.LogError(CronJobConstants.FormatDefaultExceptionMessage<CronFormatException>(Config.Cron, this));
+                _logger.LogError(CronJobConstants.FormatExceptionMessage<CronFormatException>(Config.Cron, this));
 
                 await StopAsync(cancellationToken);
                 return;
@@ -141,17 +141,17 @@ namespace AspNetCoreWorkerScheduler.Jobs
             }
             catch (InvalidNextCronOccurenceException)
             {
-                _logger.LogError(CronJobConstants.FormatDefaultExceptionMessage<InvalidNextCronOccurenceException>(this, Config?.Cron, from, _timeZoneInfo));
+                _logger.LogError(CronJobConstants.FormatExceptionMessage<InvalidNextCronOccurenceException>(this, Config?.Cron, from, _timeZoneInfo));
                 await StopAsync(cancellationToken);
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning(CronJobConstants.FormatDefaultExceptionMessage<OperationCanceledException>(this));
+                _logger.LogWarning(CronJobConstants.FormatExceptionMessage<OperationCanceledException>(this));
                 await StopAsync(cancellationToken);
             }
             catch (Exception e)
             {
-                _logger.LogError(CronJobConstants.FormatDefaultExceptionMessage<Exception>(this, e.Message?.TrimEnd()));
+                _logger.LogError(CronJobConstants.FormatExceptionMessage<Exception>(this, e.Message?.TrimEnd()));
                 await RestartAsync(cancellationToken);
             }
         }
@@ -193,7 +193,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
 
         protected virtual Task StopHandler()
         {
-            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is stopping...");
+            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is stopping");
             return Task.CompletedTask;
         }
 
@@ -253,7 +253,7 @@ namespace AspNetCoreWorkerScheduler.Jobs
 
         public virtual void Dispose()
         {
-            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is disposing...");
+            _logger.LogWarning($"{DateTime.Now:hh:mm:ss}: {this} is disposing");
 
             _configurationChangeListener.Dispose();
             _timer?.Dispose();
